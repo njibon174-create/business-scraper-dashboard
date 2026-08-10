@@ -1377,9 +1377,9 @@ export default function App() {
         />
       )}
 
-      {/* ── HEADER ──────────────────────────────────────────── */}
+      {/* ── HEADER — sticky on desktop, normal flow on mobile ── */}
       <header
-        className="flex-shrink-0 sticky top-0 z-30"
+        className="flex-shrink-0 lg:sticky lg:top-0 z-30"
         style={{
           background: 'rgba(6,9,15,0.85)',
           backdropFilter: 'blur(16px)',
@@ -1446,10 +1446,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* ── KPI CARDS ─────────────────────────────────────── */}
+      {/* ── KPI CARDS — sticky on desktop, normal flow on mobile ─ */}
       <div
-        className="flex-shrink-0 px-3 py-2"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+        className="flex-shrink-0 lg:sticky lg:top-[52px] z-20 px-3 py-2"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(6,9,15,0.9)', backdropFilter: 'blur(8px)' }}
       >
         {/* Primary row: 4 cards - compact */}
         <div className="grid grid-cols-4 gap-1.5 mb-2">
@@ -1463,23 +1463,26 @@ export default function App() {
               </>
           }
         </div>
-        {/* CRM status row - 5 equal cards on desktop */}
-        <div className="hidden lg:grid grid-cols-5 gap-2">
-          {loading
-            ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
-            : crmStatusOptions.map(s => (
-                <StatusKPICard
-                  key={s.value}
-                  statusOption={s}
-                  count={
-                    s.value === 'call_reminder' ? countCall :
-                    s.value === 'pending' ? countPending :
-                    s.value === 'interested' ? countInterested :
-                    s.value === 'client' ? countClient : 0
-                  }
-                />
-              ))
-          }
+        {/* CRM status row - 5 equal cards on desktop, compact */}
+        <div className="hidden lg:block">
+          <div className="flex justify-start gap-2">
+            {loading
+              ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
+              : crmStatusOptions.map(s => (
+                  <div key={s.value} className="flex-shrink-0 w-36">
+                    <StatusKPICard
+                      statusOption={s}
+                      count={
+                        s.value === 'call_reminder' ? countCall :
+                        s.value === 'pending' ? countPending :
+                        s.value === 'interested' ? countInterested :
+                        s.value === 'client' ? countClient : 0
+                      }
+                    />
+                  </div>
+                ))
+            }
+          </div>
         </div>
         {/* Mobile CRM row - horizontal scroll */}
         <div className="flex lg:hidden gap-2 overflow-x-auto pb-0.5">
@@ -1503,13 +1506,14 @@ export default function App() {
       </div>
 
       {/* ── MAIN CONTENT ────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Desktop: list scrolls, drawer sticky. Mobile: page scrolls. */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* Business List */}
         <div
           className="flex flex-col overflow-hidden"
           style={{
-            width: '100%',
+            flex: 1,
             borderRight: '1px solid rgba(255,255,255,0.05)',
             background: 'rgba(9,14,24,0.6)',
             animation: 'fadeUp 0.3s ease-out',
@@ -1593,8 +1597,9 @@ export default function App() {
             onClick={handleCloseDrawer}
           />
           <div
-            className="fixed inset-x-0 bottom-0 z-50 md:hidden rounded-t-2xl overflow-hidden flex flex-col max-h-[88vh]"
+            className="fixed inset-x-0 bottom-0 z-50 md:hidden flex flex-col overflow-hidden rounded-t-2xl"
             style={{
+              maxHeight: '90vh',
               background: 'rgba(9,14,24,0.97)',
               borderTop: '1px solid rgba(99,179,237,0.2)',
               boxShadow: '0 -8px 40px rgba(59,130,246,0.15)',
@@ -1605,15 +1610,17 @@ export default function App() {
               className="w-12 h-1.5 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.1)' }}
             />
-            <DetailsDrawer
-              business={selectedBiz}
-              onClose={handleCloseDrawer}
-              onStatusChange={handleStatusChange}
-              onNoteSave={handleNoteSave}
-              savingId={savingId}
-              savingNoteId={savingNoteId}
-              onDelete={setDeleteTarget}
-            />
+            <div className="overflow-y-auto flex-1">
+              <DetailsDrawer
+                business={selectedBiz}
+                onClose={handleCloseDrawer}
+                onStatusChange={handleStatusChange}
+                onNoteSave={handleNoteSave}
+                savingId={savingId}
+                savingNoteId={savingNoteId}
+                onDelete={setDeleteTarget}
+              />
+            </div>
           </div>
         </>
       )}

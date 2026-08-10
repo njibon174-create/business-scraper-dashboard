@@ -571,6 +571,7 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
   const [optAddress,  setOptAddress]   = useState(true)
   const [found,       setFound]        = useState(0)
   const [progress,    setProgress]     = useState(0)
+  const intervalRef = useRef(null)
 
   const stopScraping = () => {
     setScraping(false)

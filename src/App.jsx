@@ -1364,7 +1364,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="h-screen flex flex-col overflow-hidden"
       style={{ background: 'rgba(6,9,15,1)', animation: 'fadeUp 0.4s ease-out' }}
     >
       {/* ── DELETE CONFIRM MODAL ──────────────────────────────── */}
@@ -1463,29 +1463,28 @@ export default function App() {
               </>
           }
         </div>
-        {/* CRM status row - 5 equal cards on desktop, compact */}
+        {/* CRM status row - 5 equal cards on desktop (grid) */}
         <div className="hidden lg:block">
-          <div className="flex justify-start gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {loading
               ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
               : crmStatusOptions.map(s => (
-                  <div key={s.value} className="flex-shrink-0 w-36">
-                    <StatusKPICard
-                      statusOption={s}
-                      count={
-                        s.value === 'call_reminder' ? countCall :
-                        s.value === 'pending' ? countPending :
-                        s.value === 'interested' ? countInterested :
-                        s.value === 'client' ? countClient : 0
-                      }
-                    />
-                  </div>
+                  <StatusKPICard
+                    key={s.value}
+                    statusOption={s}
+                    count={
+                      s.value === 'call_reminder' ? countCall :
+                      s.value === 'pending' ? countPending :
+                      s.value === 'interested' ? countInterested :
+                      s.value === 'client' ? countClient : 0
+                    }
+                  />
                 ))
             }
           </div>
         </div>
-        {/* Mobile CRM row - horizontal scroll */}
-        <div className="flex lg:hidden gap-2 overflow-x-auto pb-0.5">
+        {/* Mobile CRM row - 2 rows grid */}
+        <div className="flex lg:hidden gap-2 overflow-y-auto max-h-28 pb-0.5">
           {loading
             ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
             : crmStatusOptions.map(s => (

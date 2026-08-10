@@ -1,4 +1,5 @@
 'use client'
+// v1.0.1 — workflow trigger via Supabase Edge Function
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import Papa from 'papaparse'

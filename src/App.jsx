@@ -1373,7 +1373,7 @@ export default function App() {
   return (
     <div
       className="h-screen flex flex-col overflow-hidden"
-      style={{ background: 'rgba(6,9,15,1)', animation: 'fadeUp 0.4s ease-out' }}
+      style={{ height: '100dvh', background: 'rgba(6,9,15,1)', animation: 'fadeUp 0.4s ease-out' }}
     >
       {/* ── DELETE CONFIRM MODAL ──────────────────────────────── */}
       {deleteTarget && (

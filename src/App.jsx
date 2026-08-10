@@ -549,39 +549,72 @@ function EmptyState({ hasFilters, onResetFilters }) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// NEW SCRAPE PANEL
+// SUPABASE EDGE FUNCTION URL — set via VITE env
 // ────────────────────────────────────────────────────────────────
-function NewScrapePanel({ onClose }) {
-  const [location,   setLocation] = useState('Dhaka, Bangladesh')
-  const [bizType,    setBizType]   = useState('')
-  const [keywords,   setKeywords]  = useState('')
-  const [count,      setCount]     = useState(50)
-  const [optWebsite, setOptWebsite] = useState(true)
-  const [optPhone,   setOptPhone]   = useState(true)
-  const [optFb,      setOptFb]      = useState(true)
-  const [optAddress, setOptAddress] = useState(true)
-  const [scraping,   setScraping]  = useState(false)
-  const [progress,   setProgress]  = useState(0)
-  const [found,       setFound]     = useState(0)
+const EDGE_FUNCTION_URL = import.meta.env.VITE_EDGE_FUNCTION_URL || ''
+
+function NewScrapePanel({ onClose, onScrapeStarted }) {
+  const [location,   setLocation]   = useState('Dhaka, Bangladesh')
+  const [bizType,    setBizType]    = useState('')
+  const [keywords,   setKeywords]   = useState('')
+  const [count,      setCount]      = useState(50)
+  const [scraping,   setScraping]   = useState(false)
+  const [runInfo,    setRunInfo]    = useState(null)     // { run_number, run_id, workflow_url }
+  const [runError,   setRunError]   = useState(null)
+  const [statusMsg,  setStatusMsg]  = useState('')
   const intervalRef = useRef(null)
 
   const stopScraping = () => {
     setScraping(false)
     clearInterval(intervalRef.current)
+    setStatusMsg('')
   }
 
-  const handleScrape = () => {
+  const handleScrape = async () => {
     if (!bizType.trim()) return
+
+    const query = `${bizType.trim()} in ${location.trim()}`
     setScraping(true)
-    setProgress(0)
-    setFound(0)
-    let p = 0
-    intervalRef.current = setInterval(() => {
-      p += Math.random() * 14
-      if (p >= 100) { p = 100; clearInterval(intervalRef.current); setScraping(false) }
-      setProgress(Math.min(Math.round(p), 100))
-      setFound(Math.round(p * count / 100))
-    }, 380)
+    setRunInfo(null)
+    setRunError(null)
+    setStatusMsg(`Triggering workflow for: "${query}"…`)
+
+    if (!EDGE_FUNCTION_URL) {
+      setRunError('Edge Function URL not configured. Set VITE_EDGE_FUNCTION_URL in Vercel.')
+      setScraping(false)
+      return
+    }
+
+    try {
+      const res = await fetch(EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      })
+      const data = await res.json()
+
+      if (!res.ok || data.error) {
+        setRunError(data.error || `HTTP ${res.status}`)
+        setScraping(false)
+        return
+      }
+
+      setRunInfo(data)
+      setStatusMsg(`✅ Workflow #${data.run_number} triggered! Data will appear in dashboard shortly.`)
+      setScraping(false)
+
+      // Notify parent to refresh
+      if (onScrapeStarted) onScrapeStarted(data)
+
+      // Auto-close after 4s
+      setTimeout(() => {
+        if (onClose) onClose()
+      }, 4000)
+
+    } catch (err) {
+      setRunError(err.message || 'Network error')
+      setScraping(false)
+    }
   }
 
   // Cleanup on unmount
@@ -725,9 +758,25 @@ function NewScrapePanel({ onClose }) {
             disabled={!bizType.trim() || scraping}
             className="flex-1 btn-primary flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40"
           >
-            <Icon.Zap /> Start Scraping
+            <Icon.Zap /> Trigger GitHub Workflow
           </button>
         </div>
+
+        {/* Status / Error message */}
+        {statusMsg && (
+          <div className="px-6 pb-4">
+            <div className="text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-3 py-2">
+              {statusMsg}
+            </div>
+          </div>
+        )}
+        {runError && (
+          <div className="px-6 pb-4">
+            <div className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+              ⚠ {runError}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1109,7 +1158,7 @@ export default function App() {
       )}
 
       {/* New Scrape Panel */}
-      {showScrape && <NewScrapePanel onClose={() => setShowScrape(false)} />}
+      {showScrape && <NewScrapePanel onClose={() => setShowScrape(false)} onScrapeStarted={handleRefresh} />}
     </div>
   )
 }

@@ -549,9 +549,10 @@ function EmptyState({ hasFilters, onResetFilters }) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// SUPABASE EDGE FUNCTION URL — set via VITE env
+// SUPABASE EDGE FUNCTION URL + ANON KEY
 // ────────────────────────────────────────────────────────────────
 const EDGE_FUNCTION_URL = import.meta.env.VITE_EDGE_FUNCTION_URL || ''
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''  // reuse existing
 
 function NewScrapePanel({ onClose, onScrapeStarted }) {
   const [location,   setLocation]   = useState('Dhaka, Bangladesh')
@@ -588,7 +589,11 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
     try {
       const res = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
         body: JSON.stringify({ query }),
       })
       const data = await res.json()

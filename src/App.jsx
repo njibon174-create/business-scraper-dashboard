@@ -751,10 +751,10 @@ function FilterBar({ filters, onChange, total, filtered }) {
 
   return (
     <div
-      className="px-4 py-3"
+      className="px-2 py-2"
       style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(6,10,20,0.6)' }}
     >
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
 
         {/* Search */}
         <div className="relative">
@@ -766,10 +766,10 @@ function FilterBar({ filters, onChange, total, filtered }) {
           </span>
           <input
             type="text"
-            placeholder="Search businesses, phone, address…"
+            placeholder="Search…"
             value={search}
             onChange={e => onChange({ ...filters, search: e.target.value })}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg transition-all outline-none"
+            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg transition-all outline-none"
             style={{
               background: 'rgba(15,22,41,0.8)',
               border: '1px solid rgba(255,255,255,0.08)',
@@ -789,7 +789,7 @@ function FilterBar({ filters, onChange, total, filtered }) {
         </div>
 
         {/* Filter row */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           <FilterSelect
             value={status || 'all'}
             onChange={v => onChange({ ...filters, status: v })}
@@ -1386,47 +1386,41 @@ export default function App() {
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <div className="px-3 py-2.5 flex items-center justify-between gap-4">
+        <div className="px-2 py-1.5 flex items-center justify-between gap-3">
 
           {/* Left: Brand */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', boxShadow: '0 0 16px rgba(59,130,246,0.35)' }}
+              className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', boxShadow: '0 0 12px rgba(59,130,246,0.3)' }}
             >
-              <span style={{ color: '#fff' }}><Icon.Building /></span>
+              <span className="text-white text-sm"><Icon.Building /></span>
             </div>
-            <div>
-              <h1 className="text-sm font-bold text-white">Business Scraper</h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="status-dot" />
-                <span className="text-xs" style={{ color: '#10b981' }}>Google Places API Connected</span>
-              </div>
-            </div>
+            <h1 className="text-xs font-bold text-white whitespace-nowrap">BizScraper</h1>
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5">
               <button
                 onClick={() => setShowScrape(true)}
-                className="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                className="btn-primary flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
               >
-                <Icon.Plus /> New Search
+                <Icon.Plus /> New
               </button>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+                className="btn-ghost flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
               >
-                <Icon.Refresh className={refreshing ? 'animate-spin' : ''} /> Refresh
+                <Icon.Refresh className={refreshing ? 'animate-spin' : ''} />
               </button>
               <button
                 onClick={() => exportCSV(filtered)}
                 disabled={filtered.length === 0}
-                className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-30"
+                className="btn-ghost flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium disabled:opacity-30"
               >
-                <Icon.Download /> Export
+                <Icon.Download />
               </button>
             </div>
 
@@ -1434,14 +1428,14 @@ export default function App() {
             <div className="flex sm:hidden items-center gap-1">
               <button
                 onClick={() => setShowScrape(true)}
-                className="p-2 rounded-lg btn-primary"
+                className="p-1.5 rounded-lg btn-primary"
               >
                 <Icon.Plus />
               </button>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="p-2 rounded-lg transition-colors"
+                className="p-1.5 rounded-lg"
                 style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(148,163,184,0.8)' }}
               >
                 <Icon.Refresh className={refreshing ? 'animate-spin' : ''} />

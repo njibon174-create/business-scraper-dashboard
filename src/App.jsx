@@ -1394,7 +1394,7 @@ export default function App() {
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <div className="px-4 py-3 flex items-center justify-between gap-4">
+        <div className="px-3 py-2.5 flex items-center justify-between gap-4">
 
           {/* Left: Brand */}
           <div className="flex items-center gap-3 min-w-0">
@@ -1461,37 +1461,37 @@ export default function App() {
 
       {/* ── KPI CARDS ─────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 px-4 py-4"
+        className="flex-shrink-0 px-3 py-2"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
       >
         {/* Primary row: 4 existing cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
           {loading
             ? [0,1,2,3].map(i => <KPICardSkeleton key={i} index={i} />)
             : <>
-                <KPICard index={0} icon={Icon.Building} label="Total Businesses" value={countTotal.toLocaleString()} sub={`${pct(stats.total)}% collected`} />
-                <KPICard index={1} icon={Icon.Globe}   label="Websites Found"   value={countWeb.toLocaleString()}   sub={`${pct(stats.web)}% coverage`} />
-                <KPICard index={2} icon={Icon.Facebook} label="Facebook Found"  value={countFb.toLocaleString()}    sub={`${pct(stats.fb)}% coverage`} />
-                <KPICard index={3} icon={Icon.Phone}    label="Phones Found"     value={countPhone.toLocaleString()} sub={`${pct(stats.phone)}% coverage`} />
+                <KPICard index={0} icon={Icon.Building} label="Total"    value={countTotal.toLocaleString()} sub={`${pct(stats.total)}%`} />
+                <KPICard index={1} icon={Icon.Globe}   label="Websites" value={countWeb.toLocaleString()}   sub={`${pct(stats.web)}%`} />
+                <KPICard index={2} icon={Icon.Facebook} label="Facebook" value={countFb.toLocaleString()}   sub={`${pct(stats.fb)}%`} />
+                <KPICard index={3} icon={Icon.Phone}   label="Phones"   value={countPhone.toLocaleString()} sub={`${pct(stats.phone)}%`} />
               </>
           }
         </div>
         {/* CRM status row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-x-auto">
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
           {loading
             ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
             : crmStatusOptions.map(s => (
-                <StatusKPICard
-                  key={s.value}
-                  statusOption={s}
-                  count={
-                    s.value === 'call_reminder' ? countCall :
-                    s.value === 'pending' ? countPending :
-                    s.value === 'interested' ? countInterested :
-                    s.value === 'client' ? countClient :
-                    stats[s.value] || 0
-                  }
-                />
+                <div key={s.value} className="flex-shrink-0">
+                  <StatusKPICard
+                    statusOption={s}
+                    count={
+                      s.value === 'call_reminder' ? countCall :
+                      s.value === 'pending' ? countPending :
+                      s.value === 'interested' ? countInterested :
+                      s.value === 'client' ? countClient : 0
+                    }
+                  />
+                </div>
               ))
           }
         </div>

@@ -151,14 +151,11 @@ function KPICard({ icon: IconCmp, label, value, sub, accent, index, loading }) {
 
   return (
     <div
-      className="glass-card rounded-xl p-4 gb-card group transition-all duration-200 cursor-default"
-      style={{
-        borderColor: c.border,
-        transition: 'all 0.2s ease',
-      }}
+      className="glass-card rounded-xl p-2.5 gb-card transition-all duration-200 cursor-default"
+      style={{ borderColor: c.border }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = `0 0 20px ${c.glow}, 0 8px 24px rgba(0,0,0,0.3)`
+        e.currentTarget.style.transform = 'translateY(-1px)'
+        e.currentTarget.style.boxShadow = `0 0 20px ${c.glow}`
         e.currentTarget.style.borderColor = c.border.replace('0.25', '0.5')
       }}
       onMouseLeave={e => {
@@ -167,19 +164,14 @@ function KPICard({ icon: IconCmp, label, value, sub, accent, index, loading }) {
         e.currentTarget.style.borderColor = c.border
       }}
     >
-      <div className="flex items-start gap-3">
-        <div
-          className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: c.iconBg, color: c.icon }}
-        >
+      <div className="flex items-start gap-2">
+        <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: c.iconBg, color: c.icon }}>
           <IconCmp />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'rgba(148,163,184,0.7)' }}>
-            {label}
-          </p>
-          <p className="text-2xl font-bold text-white mt-0.5">{value}</p>
-          {sub && <p className="text-xs mt-0.5" style={{ color: 'rgba(148,163,184,0.6)' }}>{sub}</p>}
+          <p className="text-[10px] font-medium uppercase tracking-wider truncate" style={{ color: 'rgba(148,163,184,0.7)' }}>{label}</p>
+          <p className="text-lg font-bold text-white leading-tight">{value}</p>
+          {sub && <p className="text-[10px] mt-0.5 truncate" style={{ color: 'rgba(148,163,184,0.6)' }}>{sub}</p>}
         </div>
       </div>
     </div>
@@ -1464,15 +1456,15 @@ export default function App() {
         className="flex-shrink-0 px-3 py-2"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
       >
-        {/* Primary row: 4 existing cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+        {/* Primary row: 4 cards - compact */}
+        <div className="grid grid-cols-4 gap-1.5 mb-2">
           {loading
             ? [0,1,2,3].map(i => <KPICardSkeleton key={i} index={i} />)
             : <>
-                <KPICard index={0} icon={Icon.Building} label="Total"    value={countTotal.toLocaleString()} sub={`${pct(stats.total)}%`} />
-                <KPICard index={1} icon={Icon.Globe}   label="Websites" value={countWeb.toLocaleString()}   sub={`${pct(stats.web)}%`} />
-                <KPICard index={2} icon={Icon.Facebook} label="Facebook" value={countFb.toLocaleString()}   sub={`${pct(stats.fb)}%`} />
-                <KPICard index={3} icon={Icon.Phone}   label="Phones"   value={countPhone.toLocaleString()} sub={`${pct(stats.phone)}%`} />
+                <KPICard index={0} icon={Icon.Building} label="Total"    value={countTotal.toLocaleString()}  sub={`${pct(stats.total)}%`} />
+                <KPICard index={1} icon={Icon.Globe}   label="Web"      value={countWeb.toLocaleString()}   sub={`${pct(stats.web)}%`} />
+                <KPICard index={2} icon={Icon.Facebook} label="FB"      value={countFb.toLocaleString()}    sub={`${pct(stats.fb)}%`} />
+                <KPICard index={3} icon={Icon.Phone}   label="Phone"    value={countPhone.toLocaleString()} sub={`${pct(stats.phone)}%`} />
               </>
           }
         </div>

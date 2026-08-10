@@ -602,7 +602,15 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({
+          query: bizType.trim(),
+          location: location.trim(),
+          keywords: keywords.trim(),
+          collect_website:  optWebsite,
+          collect_phone:    optPhone,
+          collect_facebook: optFb,
+          collect_address:  optAddress,
+        }),
       })
       const data = await res.json()
 

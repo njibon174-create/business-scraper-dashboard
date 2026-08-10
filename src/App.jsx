@@ -764,7 +764,7 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
             disabled={!bizType.trim() || scraping}
             className="flex-1 btn-primary flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-40"
           >
-            <Icon.Zap /> Trigger GitHub Workflow
+            <Icon.Zap /> 🔥 Run GitHub Workflow
           </button>
         </div>
 

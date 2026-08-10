@@ -1364,8 +1364,8 @@ export default function App() {
 
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden"
-      style={{ height: '100dvh', background: 'rgba(6,9,15,1)', animation: 'fadeUp 0.4s ease-out' }}
+      className="min-h-screen flex flex-col"
+      style={{ background: 'rgba(6,9,15,1)', animation: 'fadeUp 0.4s ease-out' }}
     >
       {/* ── DELETE CONFIRM MODAL ──────────────────────────────── */}
       {deleteTarget && (
@@ -1396,7 +1396,8 @@ export default function App() {
             >
               <span className="text-white text-sm"><Icon.Building /></span>
             </div>
-            <h1 className="text-xs font-bold text-white whitespace-nowrap">BizScraper</h1>
+            <h1 className="text-xs font-bold text-white whitespace-nowrap">Business Scraper</h1>
+            <span className="text-[10px] text-white/30 whitespace-nowrap">Product of Xaflab</span>
           </div>
 
           {/* Right actions */}
@@ -1462,8 +1463,26 @@ export default function App() {
               </>
           }
         </div>
-        {/* CRM status row */}
-        <div className="flex gap-2 overflow-x-auto pb-0.5">
+        {/* CRM status row - 5 equal cards on desktop */}
+        <div className="hidden lg:grid grid-cols-5 gap-2">
+          {loading
+            ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
+            : crmStatusOptions.map(s => (
+                <StatusKPICard
+                  key={s.value}
+                  statusOption={s}
+                  count={
+                    s.value === 'call_reminder' ? countCall :
+                    s.value === 'pending' ? countPending :
+                    s.value === 'interested' ? countInterested :
+                    s.value === 'client' ? countClient : 0
+                  }
+                />
+              ))
+          }
+        </div>
+        {/* Mobile CRM row - horizontal scroll */}
+        <div className="flex lg:hidden gap-2 overflow-x-auto pb-0.5">
           {loading
             ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
             : crmStatusOptions.map(s => (

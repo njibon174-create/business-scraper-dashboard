@@ -1,8 +1,23 @@
 'use client'
-// v1.0.1 — workflow trigger via Supabase Edge Function
+// v1.0.2 — CRM features: status tracking, notes, delete, status filter + stats
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from './supabase'
 import Papa from 'papaparse'
+
+// ────────────────────────────────────────────────────────────────
+// STATUS SYSTEM
+// ────────────────────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { value: 'new',           label: 'New',           icon: '🆕', bg: 'rgba(71,85,105,0.2)',   color: '#94a3b8', border: 'rgba(71,85,105,0.3)' },
+  { value: 'call_reminder',  label: 'Call Reminder', icon: '📞', bg: 'rgba(249,115,22,0.15)', color: '#fb923c', border: 'rgba(249,115,22,0.25)' },
+  { value: 'pending',        label: 'Pending',       icon: '⏳', bg: 'rgba(234,179,8,0.15)',  color: '#facc15', border: 'rgba(234,179,8,0.25)' },
+  { value: 'interested',     label: 'Interested',    icon: '✅', bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa', border: 'rgba(59,130,246,0.25)' },
+  { value: 'client',         label: 'Client',        icon: '🤝', bg: 'rgba(16,185,129,0.15)',  color: '#34d399', border: 'rgba(16,185,129,0.25)' },
+  { value: 'not_interested', label: 'Not Interested',icon: '❌', bg: 'rgba(239,68,68,0.15)',   color: '#f87171', border: 'rgba(239,68,68,0.25)' },
+]
+
+const getStatusStyle = (status) =>
+  STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0]
 
 // ────────────────────────────────────────────────────────────────
 // CSV — preserved exactly
@@ -12,6 +27,7 @@ function exportCSV(data) {
     Name: b.name || '', Phone: b.phone || '',
     Website: b.website || '', Facebook: b.facebook_url || '',
     Address: b.address || '', Lat: b.lat || '', Lng: b.lng || '',
+    Status: b.status || 'new', Notes: b.notes || '',
   }))
   const csv = Papa.unparse(rows)
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -19,7 +35,7 @@ function exportCSV(data) {
   link.href = URL.createObjectURL(blob)
   link.download = `businesses_${Date.now()}.csv`
   link.click()
-  URL.revokeObjectURL(url)
+  URL.revokeObjectURL(link.href)
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -46,6 +62,10 @@ const Icon = {
   Check:        () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>,
   ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>,
   Zap:          () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  Trash:        () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+  Note:         () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  Spinner:      () => <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="0.75" strokeLinecap="round"/></svg>,
+  Warning:      () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -53,6 +73,53 @@ const Icon = {
 // ────────────────────────────────────────────────────────────────
 function Skeleton({ className }) {
   return <div className={`skeleton rounded ${className}`} />
+}
+
+// ────────────────────────────────────────────────────────────────
+// STATUS BADGE COMPONENT
+// ────────────────────────────────────────────────────────────────
+function StatusBadge({ status, onChange, disabled, saving }) {
+  const s = getStatusStyle(status)
+
+  if (onChange) {
+    return (
+      <div className="relative inline-flex items-center">
+        <select
+          value={status || 'new'}
+          disabled={disabled || saving}
+          onChange={e => onChange(e.target.value)}
+          className="pl-1.5 pr-5 py-0.5 rounded text-xs font-medium border cursor-pointer transition-all outline-none appearance-none"
+          style={{
+            background: s.bg,
+            color: s.color,
+            borderColor: s.border,
+            opacity: (disabled || saving) ? 0.6 : 1,
+          }}
+          onFocus={e => e.target.style.boxShadow = `0 0 0 2px ${s.border.replace('0.25', '0.5')}`}
+          onBlur={e => e.target.style.boxShadow = 'none'}
+        >
+          {STATUS_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
+          ))}
+        </select>
+        <span
+          className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ color: s.color, opacity: 0.6 }}
+        >
+          {saving ? <Icon.Spinner /> : <Icon.ChevronDown />}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border"
+      style={{ background: s.bg, color: s.color, borderColor: s.border }}
+    >
+      {s.icon} {s.label}
+    </span>
+  )
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -120,7 +187,61 @@ function KPICard({ icon: IconCmp, label, value, sub, accent, index, loading }) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// BADGE
+// STATUS KPI CARD (colored for CRM status)
+// ────────────────────────────────────────────────────────────────
+function StatusKPICard({ statusOption, count, loading }) {
+  const s = statusOption
+
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-4 gb-card">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-9 h-9 rounded-lg flex-shrink-0" />
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-2 w-16" />
+            <Skeleton className="h-6 w-8" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="glass-card rounded-xl p-3 gb-card group transition-all duration-200 cursor-default"
+      style={{
+        borderColor: s.border,
+        transition: 'all 0.2s ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-1px)'
+        e.currentTarget.style.boxShadow = `0 0 16px ${s.bg}`
+        e.currentTarget.style.borderColor = s.border.replace('0.25', '0.5')
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.borderColor = s.border
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base"
+          style={{ background: s.bg, color: s.color }}
+        >
+          {s.icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium truncate" style={{ color: s.color }}>{s.label}</p>
+          <p className="text-xl font-bold text-white">{count}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────
+// BADGE (existing)
 // ────────────────────────────────────────────────────────────────
 function Badge({ icon, label, variant }) {
   const vars = {
@@ -141,12 +262,148 @@ function Badge({ icon, label, variant }) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// DELETE CONFIRMATION MODAL
+// ────────────────────────────────────────────────────────────────
+function DeleteConfirmModal({ business, onConfirm, onCancel, deleting }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(6,9,15,0.8)', backdropFilter: 'blur(6px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onCancel() }}
+    >
+      <div
+        className="glass-card rounded-xl w-full max-w-sm mx-4 p-6"
+        style={{ border: '1px solid rgba(239,68,68,0.2)', animation: 'scaleIn 0.2s ease-out' }}
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}
+          >
+            <Icon.Warning />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white text-sm">Delete Business?</h3>
+            <p className="text-xs mt-1" style={{ color: 'rgba(148,163,184,0.6)' }}>
+              <span className="font-medium text-white">{business?.name}</span> will be permanently removed. This cannot be undone.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            disabled={deleting}
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium btn-ghost disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+            style={{
+              background: deleting ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              color: '#f87171',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {deleting ? <span className="flex items-center justify-center gap-1.5"><Icon.Spinner /> Deleting…</span> : '🗑️ Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────
+// NOTE EDITOR (expandable per row)
+// ────────────────────────────────────────────────────────────────
+function NoteEditor({ business, onSave, saving }) {
+  const [note, setNote] = useState(business.notes || '')
+  const [open, setOpen] = useState(false)
+
+  const handleSave = () => {
+    onSave(business.id, note)
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => { setNote(business.notes || ''); setOpen(true) }}
+        className="flex-shrink-0 p-1 rounded transition-all"
+        style={{
+          color: business.notes ? 'rgba(251,191,36,0.7)' : 'rgba(148,163,184,0.25)',
+          background: 'transparent',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(251,191,36,0.08)'; e.currentTarget.style.color = '#fbbf24' }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = business.notes ? 'rgba(251,191,36,0.7)' : 'rgba(148,163,184,0.25)' }}
+        title={business.notes ? 'Edit note' : 'Add note'}
+      >
+        {business.notes ? '📝' : '📝'}
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="relative"
+      style={{
+        background: 'rgba(15,22,41,0.95)',
+        border: '1px solid rgba(251,191,36,0.25)',
+        borderRadius: 8,
+      }}
+    >
+      <textarea
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        placeholder="Add a note…"
+        rows={3}
+        className="w-full px-3 py-2 text-xs rounded-lg outline-none resize-none"
+        style={{
+          background: 'transparent',
+          color: '#e2e8f0',
+          border: 'none',
+        }}
+        autoFocus
+        onKeyDown={e => { if (e.key === 'Escape') setOpen(false) }}
+      />
+      <div className="flex items-center justify-end gap-1.5 px-2 pb-2">
+        <button
+          onClick={() => setOpen(false)}
+          className="px-2 py-1 text-xs rounded font-medium"
+          style={{ color: 'rgba(148,163,184,0.6)', background: 'transparent' }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs rounded font-medium transition-all"
+          style={{
+            background: 'rgba(251,191,36,0.15)',
+            border: '1px solid rgba(251,191,36,0.25)',
+            color: '#fbbf24',
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? <Icon.Spinner /> : <Icon.Check />} Save
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────
 // BUSINESS CARD
 // ────────────────────────────────────────────────────────────────
-function BusinessCard({ business, selected, onClick }) {
+function BusinessCard({ business, selected, onClick, savingId, savingNoteId, onStatusChange, onNoteSave, onDelete }) {
   const hasWebsite  = !!business.website
   const hasFacebook = !!business.facebook_url
   const hasPhone    = !!business.phone
+  const saving = savingId === business.id
+  const savingNote = savingNoteId === business.id
 
   return (
     <button
@@ -155,6 +412,7 @@ function BusinessCard({ business, selected, onClick }) {
       style={{
         background: selected ? 'rgba(59,130,246,0.08)' : 'transparent',
         borderLeft: selected ? '2px solid #3b82f6' : '2px solid transparent',
+        opacity: savingId && savingId !== business.id ? 0.6 : 1,
       }}
     >
       <div
@@ -167,7 +425,7 @@ function BusinessCard({ business, selected, onClick }) {
           } : {}),
         }}
       >
-        {/* Name + category */}
+        {/* Name + category + actions */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-sm text-white truncate">{business.name}</p>
@@ -177,11 +435,42 @@ function BusinessCard({ business, selected, onClick }) {
               </p>
             )}
           </div>
-          {business.lat && business.lng && (
-            <span className="flex-shrink-0 mt-0.5" style={{ color: '#10b981', fontSize: 11 }}>
-              <Icon.MapPin />
-            </span>
-          )}
+
+          {/* Row-level action buttons */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Note indicator */}
+            <NoteEditor business={business} onSave={onNoteSave} saving={savingNote} />
+
+            {/* Delete */}
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(business) }}
+              disabled={!!savingId}
+              className="p-1 rounded transition-all"
+              style={{ color: 'rgba(148,163,184,0.25)', background: 'transparent' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#f87171' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(148,163,184,0.25)' }}
+              title="Delete"
+            >
+              <Icon.Trash />
+            </button>
+
+            {/* Location pin */}
+            {business.lat && business.lng && (
+              <span className="flex-shrink-0" style={{ color: '#10b981', fontSize: 11 }}>
+                <Icon.MapPin />
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Status badge — row-level */}
+        <div className="mt-2">
+          <StatusBadge
+            status={business.status}
+            onChange={v => onStatusChange(business.id, v)}
+            disabled={!!savingId}
+            saving={saving}
+          />
         </div>
 
         {/* Address */}
@@ -208,9 +497,10 @@ function BusinessCard({ business, selected, onClick }) {
 // ────────────────────────────────────────────────────────────────
 // DETAILS DRAWER
 // ────────────────────────────────────────────────────────────────
-function DetailsDrawer({ business, onClose }) {
+function DetailsDrawer({ business, onClose, onStatusChange, onNoteSave, savingId, savingNoteId, onDelete }) {
   if (!business) return null
   const hasLocation = !!(business.lat && business.lng)
+  const saving = savingId === business.id
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -241,6 +531,49 @@ function DetailsDrawer({ business, onClose }) {
           {business.category && (
             <p className="text-sm mt-0.5" style={{ color: 'rgba(148,163,184,0.6)' }}>{business.category}</p>
           )}
+        </div>
+
+        {/* Status — drawer view */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider flex items-center gap-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
+            CRM Status
+          </p>
+          <StatusBadge
+            status={business.status}
+            onChange={v => onStatusChange(business.id, v)}
+            disabled={!!savingId}
+            saving={saving}
+          />
+        </div>
+
+        {/* Notes — drawer view */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider flex items-center gap-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
+            <Icon.Note /> Notes
+          </p>
+          <textarea
+            value={business.notes || ''}
+            onChange={e => {
+              const updated = { ...business, notes: e.target.value }
+              onNoteSave(business.id, e.target.value, updated)
+            }}
+            placeholder="Add notes about this business…"
+            rows={3}
+            className="w-full px-3 py-2 text-sm rounded-lg outline-none resize-none transition-all"
+            style={{
+              background: 'rgba(15,22,41,0.8)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#e2e8f0',
+            }}
+            onFocus={e => {
+              e.target.style.borderColor = 'rgba(251,191,36,0.4)'
+              e.target.style.boxShadow = '0 0 0 3px rgba(251,191,36,0.08)'
+            }}
+            onBlur={e => {
+              e.target.style.borderColor = 'rgba(255,255,255,0.08)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
         </div>
 
         {/* Source tag */}
@@ -343,6 +676,22 @@ function DetailsDrawer({ business, onClose }) {
         className="px-5 py-4 space-y-2"
         style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
       >
+        {/* Delete button in drawer */}
+        <button
+          onClick={() => onDelete(business)}
+          disabled={!!savingId}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            color: '#f87171',
+            opacity: savingId ? 0.5 : 1,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)' }}
+        >
+          <Icon.Trash /> Delete Business
+        </button>
         <button
           onClick={() => exportCSV([business])}
           className="w-full btn-primary flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium"
@@ -406,7 +755,7 @@ function FieldRow({ icon, label, value, href, copyable }) {
 // FILTER BAR
 // ────────────────────────────────────────────────────────────────
 function FilterBar({ filters, onChange, total, filtered }) {
-  const { search, hasWebsite, hasFacebook, sortBy } = filters
+  const { search, hasWebsite, hasFacebook, sortBy, status } = filters
 
   return (
     <div
@@ -449,6 +798,14 @@ function FilterBar({ filters, onChange, total, filtered }) {
 
         {/* Filter row */}
         <div className="flex flex-wrap items-center gap-2">
+          <FilterSelect
+            value={status || 'all'}
+            onChange={v => onChange({ ...filters, status: v })}
+            options={[
+              { value: 'all', label: '🏷️ All Status' },
+              ...STATUS_OPTIONS.map(s => ({ value: s.value, label: `${s.icon} ${s.label}` })),
+            ]}
+          />
           <FilterSelect
             value={hasWebsite}
             onChange={v => onChange({ ...filters, hasWebsite: v })}
@@ -553,7 +910,7 @@ function EmptyState({ hasFilters, onResetFilters }) {
 // SUPABASE EDGE FUNCTION URL + ANON KEY
 // ────────────────────────────────────────────────────────────────
 const EDGE_FUNCTION_URL = import.meta.env.VITE_EDGE_FUNCTION_URL || ''
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''  // reuse existing
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''
 
 function NewScrapePanel({ onClose, onScrapeStarted }) {
   const [location,    setLocation]    = useState('Dhaka, Bangladesh')
@@ -564,7 +921,6 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
   const [runInfo,     setRunInfo]      = useState(null)
   const [runError,    setRunError]     = useState(null)
   const [statusMsg,   setStatusMsg]    = useState('')
-  // Data collection options — local state
   const [optWebsite,  setOptWebsite]   = useState(true)
   const [optPhone,    setOptPhone]     = useState(true)
   const [optFb,       setOptFb]        = useState(true)
@@ -624,10 +980,8 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
       setStatusMsg(`✅ Workflow #${data.run_number} triggered! Data will appear in dashboard shortly.`)
       setScraping(false)
 
-      // Notify parent to refresh
       if (onScrapeStarted) onScrapeStarted(data)
 
-      // Auto-close after 4s
       setTimeout(() => {
         if (onClose) onClose()
       }, 4000)
@@ -638,7 +992,6 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
     }
   }
 
-  // Cleanup on unmount
   useEffect(() => () => clearInterval(intervalRef.current), [])
 
   return (
@@ -651,10 +1004,7 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
         className="glass-card rounded-xl w-full max-w-lg mx-4 overflow-hidden"
         style={{ animation: 'scaleIn 0.2s ease-out', border: '1px solid rgba(99,179,237,0.15)' }}
       >
-
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-6 py-4"
+        <div className="flex items-center justify-between px-6 py-4"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
         >
           <div>
@@ -674,9 +1024,7 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
           </button>
         </div>
 
-        {/* Form */}
         <div className="px-6 py-5 space-y-4">
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5 col-span-2">
               <label className="text-xs font-medium" style={{ color: 'rgba(148,163,184,0.7)' }}>Business Type *</label>
@@ -696,7 +1044,6 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
             </div>
           </div>
 
-          {/* Data options */}
           <div className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'rgba(148,163,184,0.5)' }}>
               Data to Collect
@@ -726,7 +1073,6 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
             </div>
           </div>
 
-          {/* Progress */}
           {scraping && (
             <div
               className="rounded-lg px-4 py-3.5 space-y-2.5"
@@ -766,11 +1112,7 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
           )}
         </div>
 
-        {/* Footer */}
-        <div
-          className="px-6 py-4 flex gap-3"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-        >
+        <div className="px-6 py-4 flex gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium btn-ghost">
             Cancel
           </button>
@@ -783,7 +1125,6 @@ function NewScrapePanel({ onClose, onScrapeStarted }) {
           </button>
         </div>
 
-        {/* Status / Error message */}
         {statusMsg && (
           <div className="px-6 pb-4">
             <div className="text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-3 py-2">
@@ -852,28 +1193,34 @@ function useCountUp(target, duration = 1200) {
     requestAnimationFrame(tick)
   }, [target, duration])
   return val
- }
+}
 
 // ────────────────────────────────────────────────────────────────
 // MAIN APP
 // ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [businesses,  setBusinesses]  = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error,      setError]      = useState(null)
-  const [selectedBiz,setSelectedBiz]= useState(null)
-  const [drawerOpen, setDrawerOpen]  = useState(false)
-  const [showScrape, setShowScrape]  = useState(false)
-  const [viewMode,   setViewMode]   = useState('split') // 'split' | 'list' | 'map'
-  const [copied,     setCopied]     = useState(null)
+  const [businesses,    setBusinesses]    = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [refreshing,   setRefreshing]    = useState(false)
+  const [error,         setError]         = useState(null)
+  const [selectedBiz,   setSelectedBiz]   = useState(null)
+  const [drawerOpen,    setDrawerOpen]    = useState(false)
+  const [showScrape,    setShowScrape]    = useState(false)
+  const [viewMode,      setViewMode]      = useState('split')
+  const [copied,        setCopied]        = useState(null)
+  // CRM state
+  const [savingId,      setSavingId]      = useState(null)     // id being saved (status)
+  const [savingNoteId,  setSavingNoteId]  = useState(null)     // id being saved (note)
+  const [deleteTarget,  setDeleteTarget]  = useState(null)     // business to delete
+  const [deleting,      setDeleting]      = useState(false)
 
   const [filters, setFilters] = useState({
-    search: '', hasWebsite: 'any', hasFacebook: 'any', sortBy: 'name',
+    search: '', hasWebsite: 'any', hasFacebook: 'any', sortBy: 'name', status: 'all',
   })
 
   // ── Fetch ──────────────────────────────────────────────────────
   const fetchBusinesses = useCallback(async () => {
+    if (!supabase) { setLoading(false); return }
     const { data, error: err } = await supabase
       .from('businesses')
       .select('*')
@@ -888,9 +1235,82 @@ export default function App() {
 
   const handleRefresh = () => { setRefreshing(true); fetchBusinesses() }
 
+  // ── Status update ──────────────────────────────────────────────
+  const handleStatusChange = useCallback(async (id, newStatus) => {
+    // Optimistic update
+    setBusinesses(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b))
+    if (selectedBiz?.id === id) setSelectedBiz(prev => ({ ...prev, status: newStatus }))
+    setSavingId(id)
+
+    const { error } = await supabase
+      .from('businesses')
+      .update({ status: newStatus })
+      .eq('id', id)
+
+    setSavingId(null)
+    if (error) {
+      // Revert on failure
+      setBusinesses(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b))
+      if (selectedBiz?.id === id) setSelectedBiz(prev => ({ ...prev, status: newStatus }))
+    }
+  }, [selectedBiz])
+
+  // ── Note update ───────────────────────────────────────────────
+  const handleNoteSave = useCallback(async (id, noteText, updatedBiz) => {
+    // Update local state immediately if updatedBiz provided, otherwise use optimistic
+    if (updatedBiz) {
+      setBusinesses(prev => prev.map(b => b.id === id ? updatedBiz : b))
+      if (selectedBiz?.id === id) setSelectedBiz(updatedBiz)
+    }
+    setSavingNoteId(id)
+
+    const { error } = await supabase
+      .from('businesses')
+      .update({ notes: noteText })
+      .eq('id', id)
+
+    setSavingNoteId(null)
+    if (!error && updatedBiz) {
+      setBusinesses(prev => prev.map(b => b.id === id ? { ...updatedBiz, notes: noteText } : b))
+      if (selectedBiz?.id === id) setSelectedBiz(prev => ({ ...prev, notes: noteText }))
+    }
+  }, [selectedBiz])
+
+  // ── Delete ────────────────────────────────────────────────────
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+
+    // Optimistic: remove from list immediately
+    const removedId = deleteTarget.id
+    const prev = [...businesses]
+    setBusinesses(prev => prev.filter(b => b.id !== removedId))
+    if (selectedBiz?.id === removedId) {
+      setDrawerOpen(false)
+      setTimeout(() => setSelectedBiz(null), 250)
+    }
+    setDeleteTarget(null)
+
+    const { error } = await supabase
+      .from('businesses')
+      .delete()
+      .eq('id', removedId)
+
+    if (error) {
+      // Revert
+      setBusinesses(prev)
+      setSelectedBiz(prev.find(b => b.id === removedId) || null)
+      if (prev.find(b => b.id === removedId)) setDrawerOpen(true)
+    }
+    setDeleting(false)
+  }, [deleteTarget, businesses, selectedBiz])
+
   // ── Filtered ───────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = [...businesses]
+    if (filters.status && filters.status !== 'all') {
+      list = list.filter(b => b.status === filters.status)
+    }
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase()
       list = list.filter(b =>
@@ -914,10 +1334,17 @@ export default function App() {
     web:    businesses.filter(b => b.website).length,
     fb:     businesses.filter(b => b.facebook_url).length,
     phone:  businesses.filter(b => b.phone).length,
+    call_reminder:  businesses.filter(b => b.status === 'call_reminder').length,
+    pending:       businesses.filter(b => b.status === 'pending').length,
+    interested:    businesses.filter(b => b.status === 'interested').length,
+    client:        businesses.filter(b => b.status === 'client').length,
   }), [businesses])
 
-  const hasFilters = !!(filters.search || filters.hasWebsite !== 'any' || filters.hasFacebook !== 'any')
-  const clearFilters = () => setFilters({ search: '', hasWebsite: 'any', hasFacebook: 'any', sortBy: 'name' })
+  const hasFilters = !!(
+    filters.search || filters.hasWebsite !== 'any' ||
+    filters.hasFacebook !== 'any' || filters.status !== 'all'
+  )
+  const clearFilters = () => setFilters({ search: '', hasWebsite: 'any', hasFacebook: 'any', sortBy: 'name', status: 'all' })
 
   const handleSelectBiz = (biz) => {
     setSelectedBiz(biz)
@@ -932,19 +1359,34 @@ export default function App() {
   const showMobileList = viewMode === 'list' || viewMode === 'split'
   const locBizs = filtered.filter(b => b.lat && b.lng)
 
-  // Count-up values
-  const countTotal = useCountUp(stats.total)
-  const countWeb   = useCountUp(stats.web)
-  const countFb    = useCountUp(stats.fb)
-  const countPhone = useCountUp(stats.phone)
+  const countTotal   = useCountUp(stats.total)
+  const countWeb     = useCountUp(stats.web)
+  const countFb      = useCountUp(stats.fb)
+  const countPhone   = useCountUp(stats.phone)
+  const countCall    = useCountUp(stats.call_reminder)
+  const countPending = useCountUp(stats.pending)
+  const countInterested = useCountUp(stats.interested)
+  const countClient  = useCountUp(stats.client)
 
   const pct = n => stats.total > 0 ? Math.round(n / stats.total * 100) : 0
+
+  // CRM status options for the stats row (excluding 'new' and 'not_interested' to keep row clean)
+  const crmStatusOptions = STATUS_OPTIONS.filter(s => s.value !== 'new')
 
   return (
     <div
       className="bg-atmosphere bg-grid min-h-screen flex flex-col"
       style={{ animation: 'fadeUp 0.4s ease-out' }}
     >
+      {/* ── DELETE CONFIRM MODAL ──────────────────────────────── */}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          business={deleteTarget}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          deleting={deleting}
+        />
+      )}
 
       {/* ── HEADER ──────────────────────────────────────────── */}
       <header
@@ -976,7 +1418,6 @@ export default function App() {
 
           {/* Right actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Desktop */}
             <div className="hidden sm:flex items-center gap-2">
               <button
                 onClick={() => setShowScrape(true)}
@@ -1025,7 +1466,8 @@ export default function App() {
         className="flex-shrink-0 px-4 py-4"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
       >
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Primary row: 4 existing cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
           {loading
             ? [0,1,2,3].map(i => <KPICardSkeleton key={i} index={i} />)
             : <>
@@ -1034,6 +1476,25 @@ export default function App() {
                 <KPICard index={2} icon={Icon.Facebook} label="Facebook Found"  value={countFb.toLocaleString()}    sub={`${pct(stats.fb)}% coverage`} />
                 <KPICard index={3} icon={Icon.Phone}    label="Phones Found"     value={countPhone.toLocaleString()} sub={`${pct(stats.phone)}% coverage`} />
               </>
+          }
+        </div>
+        {/* CRM status row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 overflow-x-auto">
+          {loading
+            ? crmStatusOptions.map((_, i) => <StatusKPICard key={i} statusOption={crmStatusOptions[i]} count={0} loading />)
+            : crmStatusOptions.map(s => (
+                <StatusKPICard
+                  key={s.value}
+                  statusOption={s}
+                  count={
+                    s.value === 'call_reminder' ? countCall :
+                    s.value === 'pending' ? countPending :
+                    s.value === 'interested' ? countInterested :
+                    s.value === 'client' ? countClient :
+                    stats[s.value] || 0
+                  }
+                />
+              ))
           }
         </div>
       </div>
@@ -1081,10 +1542,15 @@ export default function App() {
               ) : (
                 filtered.map(biz => (
                   <BusinessCard
-                    key={biz.place_id}
+                    key={biz.place_id || biz.id}
                     business={biz}
-                    selected={selectedBiz?.place_id === biz.place_id}
+                    selected={selectedBiz?.place_id === biz.place_id || selectedBiz?.id === biz.id}
                     onClick={() => handleSelectBiz(biz)}
+                    savingId={savingId}
+                    savingNoteId={savingNoteId}
+                    onStatusChange={handleStatusChange}
+                    onNoteSave={handleNoteSave}
+                    onDelete={setDeleteTarget}
                   />
                 ))
               )}
@@ -1147,7 +1613,15 @@ export default function App() {
               animation: 'slideRight 0.25s ease-out',
             }}
           >
-            <DetailsDrawer business={selectedBiz} onClose={handleCloseDrawer} />
+            <DetailsDrawer
+              business={selectedBiz}
+              onClose={handleCloseDrawer}
+              onStatusChange={handleStatusChange}
+              onNoteSave={handleNoteSave}
+              savingId={savingId}
+              savingNoteId={savingNoteId}
+              onDelete={setDeleteTarget}
+            />
           </div>
         )}
       </div>
@@ -1173,7 +1647,15 @@ export default function App() {
               className="w-12 h-1.5 rounded-full mx-auto mt-3 mb-1 flex-shrink-0"
               style={{ background: 'rgba(255,255,255,0.1)' }}
             />
-            <DetailsDrawer business={selectedBiz} onClose={handleCloseDrawer} />
+            <DetailsDrawer
+              business={selectedBiz}
+              onClose={handleCloseDrawer}
+              onStatusChange={handleStatusChange}
+              onNoteSave={handleNoteSave}
+              savingId={savingId}
+              savingNoteId={savingNoteId}
+              onDelete={setDeleteTarget}
+            />
           </div>
         </>
       )}

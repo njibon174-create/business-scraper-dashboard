@@ -556,15 +556,21 @@ const EDGE_FUNCTION_URL = import.meta.env.VITE_EDGE_FUNCTION_URL || ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ''  // reuse existing
 
 function NewScrapePanel({ onClose, onScrapeStarted }) {
-  const [location,   setLocation]   = useState('Dhaka, Bangladesh')
-  const [bizType,    setBizType]    = useState('')
-  const [keywords,   setKeywords]   = useState('')
-  const [count,      setCount]      = useState(50)
-  const [scraping,   setScraping]   = useState(false)
-  const [runInfo,    setRunInfo]    = useState(null)     // { run_number, run_id, workflow_url }
-  const [runError,   setRunError]   = useState(null)
-  const [statusMsg,  setStatusMsg]  = useState('')
-  const intervalRef = useRef(null)
+  const [location,    setLocation]    = useState('Dhaka, Bangladesh')
+  const [bizType,     setBizType]     = useState('')
+  const [keywords,    setKeywords]     = useState('')
+  const [count,       setCount]       = useState(50)
+  const [scraping,    setScraping]     = useState(false)
+  const [runInfo,     setRunInfo]      = useState(null)
+  const [runError,    setRunError]     = useState(null)
+  const [statusMsg,   setStatusMsg]    = useState('')
+  // Data collection options — local state
+  const [optWebsite,  setOptWebsite]   = useState(true)
+  const [optPhone,    setOptPhone]     = useState(true)
+  const [optFb,       setOptFb]        = useState(true)
+  const [optAddress,  setOptAddress]   = useState(true)
+  const [found,       setFound]        = useState(0)
+  const [progress,    setProgress]     = useState(0)
 
   const stopScraping = () => {
     setScraping(false)
